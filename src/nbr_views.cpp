@@ -448,24 +448,23 @@ const char *nbrPayloadTypeName(char plt)
     return "???";
 }
 
-// Tabelle und Alt-ID-Uebersetzung unveraendert aus getHardwareLong()
-// (src/mheard_functions.cpp), T-Deck mit den kurzen Namen.
-#define NBR_MAX_HARDWARE 36
+// Hardware-ID-Tabelle mit T-Deck-Kurznamen.
+#define NBR_MAX_HARDWARE 37
 #if defined(BOARD_T_DECK) || defined(BOARD_T_DECK_PLUS)
-static const char *const nbrHwNames[NBR_MAX_HARDWARE] = {"no info", "TLO_V2", "TLO_V1", "TLV2_1p6", "TBEAM", "TB_1268", "TB_0p7", "TECHO", "TDECK", "RAK4631", "HELTV21", "HELTV1", "TB_2101", "EB_E22", "HELTV3", "HELT_E290", "TB_1262", "TDECK+", "TB_SUPR", "ES3_E22", "TRACKER_V3", "STICK_V3", "T5_EPAPER", "TPAGER", "TDECKpro", "TBEAM_1W", "HETLV4", "T_ETH_EL", "HETL_T114", "T3S3V13", "TCONPRO", "WLPAPER", "HELT_E213", "ESP32_LORAPRS_E22", "ESP32_LORAPRS_RA01", "T_WATCH_S3"};
+static const char *const nbrHwNames[NBR_MAX_HARDWARE] = {"no info", "TLO_V2", "TLO_V1", "TLV2_1p6", "TBEAM", "TB_1268", "TB_0p7", "TECHO", "TDECK", "RAK4631", "HELTV21", "HELTV1", "TB_2101", "EB_E22", "HELTV3", "HELT_E290", "TB_1262", "TDECK+", "TB_SUPR", "ES3_E22", "TRACKER_V3", "STICK_V3", "T5_EPAPER", "TPAGER", "TDECKpro", "TBEAM_1W", "HETLV4", "T_ETH_EL", "HETL_T114", "T3S3V13", "TCONPRO", "WLPAPER", "HELT_E213", "ESP32_LORAPRS_E22", "ESP32_LORAPRS_RA01", "T_WATCH_S3", "RASPBERRY_PI"};
 #else
-static const char *const nbrHwNames[NBR_MAX_HARDWARE] = {"no info", "TLORA_V2", "TLORA_V1", "TLORA_V2_1_1p6", "TBEAM", "TBEAM_1268", "TBEAM_0p7", "T_ECHO", "TDECK", "RAK4631", "HELTEC_V2_1", "HELTEC_V1", "TBEAM_AXP2101", "EBYTE_E22", "HELTEC_V3", "HELTEC_E290", "TBEAM_1262", "TDECK_PLUS", "TBEAM_SUPREME", "ESP_S3_E22", "TRACK_V3", "STICK_V3", "T5_EPAPER", "TPAGER", "TDECKpro", "TBEAM_1W", "HELTEC_V4", "T_ETH_ELITE", "HELTEC_T114", "T3_S3_V13", "T_CON_PRO", "WIRELESS_PAPER", "HELTEC_E213", "ESP32_LORAPRS_E22", "ESP32_LORAPRS_RA01", "T_WATCH_S3"};
+static const char *const nbrHwNames[NBR_MAX_HARDWARE] = {"no info", "TLORA_V2", "TLORA_V1", "TLORA_V2_1_1p6", "TBEAM", "TBEAM_1268", "TBEAM_0p7", "T_ECHO", "TDECK", "RAK4631", "HELTEC_V2_1", "HELTEC_V1", "TBEAM_AXP2101", "EBYTE_E22", "HELTEC_V3", "HELTEC_E290", "TBEAM_1262", "TDECK_PLUS", "TBEAM_SUPREME", "ESP_S3_E22", "TRACK_V3", "STICK_V3", "T5_EPAPER", "TPAGER", "TDECKpro", "TBEAM_1W", "HELTEC_V4", "T_ETH_ELITE", "HELTEC_T114", "T3_S3_V13", "T_CON_PRO", "WIRELESS_PAPER", "HELTEC_E213", "ESP32_LORAPRS_E22", "ESP32_LORAPRS_RA01", "T_WATCH_S3", "RASPBERRY_PI"};
 #endif
 
-// Alte IDs 39..61 -> Tabellenindex (getHardwareLong(): 39->13, 40->22, 41->20,
-// 42->21, 43->14 ... 57->31, 58->32, 59->33, 60->34, 61->35).
-static const uint8_t nbrHwLegacy[61 - 39 + 1] = {13, 22, 20, 21, 14, 15, 16, 17, 18, 19, 23, 24,
-                                                   25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35};
+// Hardware-IDs 39..62 -> Tabellenindex (39->13, 40->22, 41->20,
+// 42->21, 43->14 ... 57->31, 58->32, 59->33, 60->34, 61->35, 62->36).
+static const uint8_t nbrHwLegacy[62 - 39 + 1] = {13, 22, 20, 21, 14, 15, 16, 17, 18, 19, 23, 24,
+                                                   25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36};
 
 const char *nbrHardwareName(uint8_t hw)
 {
     int ihw = hw;
-    if (ihw >= 39 && ihw <= 61)
+    if (ihw >= 39 && ihw <= 62)
         ihw = nbrHwLegacy[ihw - 39];
     if (ihw < 0 || ihw >= NBR_MAX_HARDWARE)
         ihw = 0;
