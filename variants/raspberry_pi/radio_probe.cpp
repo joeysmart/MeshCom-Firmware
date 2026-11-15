@@ -1,17 +1,35 @@
-#include <cstdio>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 
 #include <RadioLib.h>
-#include <hal/RPi/PiHal.h>
 
 #include "configuration.h"
 
-static PiHal radioHal(RPI_SPI_CHANNEL, RPI_SPI_SPEED, RPI_SPI_DEVICE, RPI_GPIO_DEVICE);
-static SX1276 radio = new Module(&radioHal, LORA_CS, LORA_DIO0, LORA_RST, LORA_DIO1);
+#include <linux/gpio/LinuxGPIOPin.h>
 
-int main()
+static SX1276 radio = new Module(RADIOLIB_NC, LORA_DIO0, LORA_RST, LORA_DIO1);
+static std::atomic<bool> packetReceived{false};
+
+void portduinoSetup()
 {
-    std::printf("[PiRadio] Initializing SX1276 ... ");
-    const int16_t state = radio.begin(
+    gpioBind(new LinuxGPIOPin(LORA_DIO0, RPI_GPIO_CHIP, LORA_DIO0, "LoRa DIO0"));
+    gpioBind(new LinuxGPIOPin(LORA_DIO1, RPI_GPIO_CHIP, LORA_DIO1, "LoRa DIO1"));
+    gpioBind(new LinuxGPIOPin(LORA_RST, RPI_GPIO_CHIP, LORA_RST, "LoRa reset"));
+    SPI.begin(RPI_SPI_PATH, RPI_SPI_SPEED);
+}
+
+static void onPacketReceived()
+{
+    packetReceived.store(true, std::memory_order_release);
+}
+
+void setup()
+{
+    Serial.begin(115200);
+    Serial.println("[PiRadio] Initializing SX1276");
+
+    int16_t state = radio.begin(
         RF_FREQUENCY,
         LORA_BANDWIDTH,
         LORA_SF,
@@ -22,17 +40,55 @@ int main()
 
     if (state != RADIOLIB_ERR_NONE)
     {
-        std::fprintf(stderr, "failed, RadioLib status %d\n", state);
-        return 1;
+        Serial.printf("[PiRadio] Initialization failed, RadioLib status %d\n", state);
+        return;
     }
 
-    std::puts("success");
-    const int16_t sleepState = radio.sleep();
-    if (sleepState != RADIOLIB_ERR_NONE)
+    radio.setPacketReceivedAction(onPacketReceived);
+    state = radio.startReceive();
+    if (state != RADIOLIB_ERR_NONE)
     {
-        std::fprintf(stderr, "[PiRadio] Radio sleep failed, status %d\n", sleepState);
-        return 1;
+        Serial.printf("[PiRadio] Receive start failed, RadioLib status %d\n", state);
+        return;
     }
 
-    return 0;
+    Serial.println("[PiRadio] Listening for LoRa packets");
+}
+
+void loop()
+{
+    if (!packetReceived.exchange(false, std::memory_order_acquire))
+    {
+        delay(1);
+        return;
+    }
+
+    uint8_t payload[256];
+    const size_t size = radio.getPacketLength();
+    int16_t state = RADIOLIB_ERR_NONE;
+    if (size > sizeof(payload))
+    {
+        Serial.printf("[PiRadio] Packet too large: %u\n", static_cast<unsigned>(size));
+        state = RADIOLIB_ERR_PACKET_TOO_LONG;
+    }
+    else
+    {
+        state = radio.readData(payload, size);
+        if (state == RADIOLIB_ERR_NONE)
+        {
+            Serial.printf("[PiRadio] RX len=%u RSSI=%d SNR=%d payload=",
+                          static_cast<unsigned>(size), radio.getRSSI(), radio.getSNR());
+            for (size_t i = 0; i < size; ++i)
+                Serial.printf("%02X", payload[i]);
+            Serial.println();
+        }
+        else
+        {
+            Serial.printf("[PiRadio] Read failed, RadioLib status %d\n", state);
+        }
+    }
+
+    state = radio.startReceive();
+    if (state != RADIOLIB_ERR_NONE)
+        Serial.printf("[PiRadio] Receive restart failed, RadioLib status %d\n", state);
 }

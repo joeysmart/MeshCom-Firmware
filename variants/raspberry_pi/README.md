@@ -1,13 +1,16 @@
-# Raspberry Pi native SX127X foundation
+# Raspberry Pi native SX127X target
 
-This is an initial Linux-native radio target, not a runnable MeshCom firmware
-port yet. It builds a small SX1276 bring-up program using RadioLib's Raspberry
-Pi `PiHal`; the main MeshCom application still depends on its ESP32/nRF52
-runtime and platform code.
+This builds a Linux-native, receive-only SX1276 application using RadioLib
+with Portduino's Linux SPI and GPIO layers. It reports received packets as
+hexadecimal bytes. It is not yet the full MeshCom application: MeshCom's main
+runtime and scheduler currently depend on the ESP32/nRF52 platform
+implementations.
 
-The target uses PlatformIO's `native` platform because the executable runs on
-the Raspberry Pi's Linux OS. `pioarduino/platform-espressif32` is for ESP32
-microcontrollers and cannot produce a Linux Raspberry Pi executable.
+Like Meshtastic's native target, this uses the Portduino framework on
+Meshtastic's pinned `platform-native` package. It runs directly on Raspberry
+Pi Linux and does not use a build container. `pioarduino/platform-espressif32`
+targets ESP32 microcontrollers and cannot produce a Linux Raspberry Pi
+executable.
 
 ## Radio wiring
 
@@ -30,18 +33,19 @@ These are configurable defaults, not a claim that every SX127X HAT uses this
 pinout. Update `LORA_*` and `RPI_SPI_*` in `configuration.h` to match the
 specific radio board. Do not connect a 5 V radio signal to Raspberry Pi GPIO.
 
-Enable SPI on the Pi and install the `lgpio` development library before
-building (for Raspberry Pi OS, `sudo apt install liblgpio-dev`).
+Enable SPI on the Pi and install the `libgpiod` development library before
+building (for Raspberry Pi OS, `sudo apt install libgpiod-dev`).
 
 ## Build and run the radio probe
 
 From the firmware repository root:
 
 ```sh
-pio run -e raspberry_pi_radio
-.pio/build/raspberry_pi_radio/program
+pio run -e raspberry_pi
+.pio/build/raspberry_pi/program
 ```
 
-The probe initializes the SX1276 using the MeshCom default LoRa parameters,
-reports the RadioLib result, then puts the radio to sleep. It does not transmit
-or start the MeshCom application.
+The target binds DIO0, DIO1, and reset through Portduino's Linux GPIO layer,
+opens the configured spidev device, and initializes the SX1276 with MeshCom's
+default LoRa settings. It does not transmit; received packets are printed as
+hexadecimal bytes.
