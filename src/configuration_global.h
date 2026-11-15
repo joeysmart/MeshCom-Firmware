@@ -229,7 +229,8 @@ static inline bool flashLayoutCompatible(int stored)
     !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && \
     !defined(BOARD_T_ECHO) && !defined(BOARD_T_DECK) && \
     !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_T5_EPAPER) && \
-    !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+    !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO) && \
+    !defined(RASPBERRY_PI_NATIVE)
 #define MC_HAS_U8G2 1
 #else
 #define MC_HAS_U8G2 0

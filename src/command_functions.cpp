@@ -49,7 +49,9 @@
 #include "ping_target.h"   // One ping-target rule
 #include "lora_setchip.h"
 #include "spectral_scan.h"
+#if defined(ENABLE_RTC)
 #include "rtc_functions.h"
+#endif
 #include "time_functions.h" // W4b: convertUNIXtoString() fuer --mheard
 #include "maxhop.h"
 #include "prod_lock.h"     // production-locked settings: gate + clamps
@@ -104,11 +106,13 @@ extern void rxSilenceGetStats(uint32_t *silences, uint32_t *longest_s, uint32_t 
 // GPS
 #include "gps_functions.h"
 
+#if defined(ENABLE_INA226)
 #include "INA226.h"
+#endif
 //TEST #include "compress_functions.h"
 
 // For display contrast control
-#if !defined(BOARD_E290) && !defined(BOARD_WIRELESS_PAPER) && !defined(BOARD_E213) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+#if !defined(BOARD_E290) && !defined(BOARD_WIRELESS_PAPER) && !defined(BOARD_E213) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO) && !defined(RASPBERRY_PI_NATIVE)
     #include <U8g2lib.h>
     extern U8G2 *u8g2;
 #endif
@@ -2076,6 +2080,9 @@ void commandAction(char *umsg_text, bool ble)
         // generic ESP32 branch below now calls. GPS_SWITCH stays here: it also
         // has to fire on the WP_DISP (Vision Master E213) branch just below,
         // which is out of scope for this pass and must not change.
+        #if defined(RASPBERRY_PI_NATIVE)
+            printfdeb("[SLEEP]...Deep sleep is not supported on Raspberry Pi\n");
+        #else
         #if defined(GPS_SWITCH)
             digitalWrite(GPS_SWITCH, LOW);   // externes GPS im deepsleep ausschalten, Flashwerte aber für wakeup bestehen lassen
         #endif
@@ -2140,6 +2147,7 @@ void commandAction(char *umsg_text, bool ble)
             esp32EnterDeepSleep();
             #endif
         #endif
+        #endif
 
         bReturn = true;
     }
@@ -2167,7 +2175,7 @@ void commandAction(char *umsg_text, bool ble)
             addBLECommandBack(response);
         }
         
-        #elif !defined(BOARD_E290) && !defined(BOARD_WIRELESS_PAPER) && !defined(BOARD_E213) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO)
+        #elif !defined(BOARD_E290) && !defined(BOARD_WIRELESS_PAPER) && !defined(BOARD_E213) && !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(BOARD_TRACKER) && !defined(BOARD_HELTEC_T114) && !defined(BOARD_T_ECHO) && !defined(BOARD_T5_EPAPER) && !defined(BOARD_T_DECK_PRO) && !defined(BOARD_T_CONNECT_PRO) && !defined(RASPBERRY_PI_NATIVE)
         if(u8g2 != NULL)
         {
             u8g2->setContrast(contrast_value);
@@ -2631,7 +2639,7 @@ void commandAction(char *umsg_text, bool ble)
 
         save_settings();
 
-        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS)
+        #if !defined(BOARD_T_DECK) && !defined(BOARD_T_DECK_PLUS) && !defined(RASPBERRY_PI_NATIVE)
         rebootAuto = millis() + 5 * 1000; // 5 Sekunden
         #endif
 
@@ -7673,7 +7681,7 @@ void commandAction(char *umsg_text, bool ble)
         {
             int ibt = meshcom_settings.node_button_pin;
             
-            #if not defined(BOARD_T_DECK_PRO) && not defined(BOARD_T_CONNECT_PRO)
+            #if not defined(BOARD_T_DECK_PRO) && not defined(BOARD_T_CONNECT_PRO) && !defined(RASPBERRY_PI_NATIVE)
             if(ibt == 0)
                 ibt = BUTTON_PIN;
             #endif
@@ -8042,7 +8050,7 @@ void commandAction(char *umsg_text, bool ble)
     {
         int ibt = meshcom_settings.node_button_pin;
 
-        #if not defined(BOARD_T_DECK_PRO) && not defined(BOARD_T_CONNECT_PRO)
+        #if not defined(BOARD_T_DECK_PRO) && not defined(BOARD_T_CONNECT_PRO) && !defined(RASPBERRY_PI_NATIVE)
         if(ibt == 0)
             ibt = BUTTON_PIN;
         #endif

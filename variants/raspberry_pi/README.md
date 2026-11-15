@@ -1,23 +1,24 @@
-# Raspberry Pi native SX127X target
+# Raspberry Pi native SX127x target
 
-This builds a Linux-native, receive-only SX1276 application using RadioLib
-with Portduino's Linux SPI and GPIO layers. It reports received packets as
-hexadecimal bytes. It is not yet the full MeshCom application: MeshCom's main
-runtime and scheduler currently depend on the ESP32/nRF52 platform
-implementations.
+This target runs the MeshCom firmware as a Linux process on a Raspberry Pi.
+It uses Portduino for the Arduino APIs, RadioLib for the SX127x radio, and
+POSIX UDP sockets for the external JSON-UDP interface.
 
-Like Meshtastic's native target, this uses the Portduino framework on
-Meshtastic's pinned `platform-native` package. It runs directly on Raspberry
-Pi Linux and does not use a build container. `pioarduino/platform-espressif32`
-targets ESP32 microcontrollers and cannot produce a Linux Raspberry Pi
-executable.
+## Requirements
+
+- Raspberry Pi OS with SPI enabled (`/dev/spidev0.0` available)
+- `libgpiod-dev` and `libi2c-dev`
+- GPIO access for the user running the firmware
+- PlatformIO Core
+
+The target uses the project-owned `linux_arm` board definition and the pinned
+Portduino framework from `platform-native`.
 
 ## Radio wiring
 
-Defaults in `configuration.h` use Raspberry Pi BCM GPIO numbering and SPI0
-CE0:
+The default pin mapping in `configuration.h` uses BCM numbering and SPI0 CE0:
 
-| SX127X | Raspberry Pi |
+| SX127x | Raspberry Pi |
 | --- | --- |
 | NSS / CS | BCM 8 (SPI0 CE0) |
 | SCK | BCM 11 |
@@ -29,14 +30,11 @@ CE0:
 | VCC | 3.3 V |
 | GND | GND |
 
-These are configurable defaults, not a claim that every SX127X HAT uses this
-pinout. Update `LORA_*` and `RPI_SPI_*` in `configuration.h` to match the
-specific radio board. Do not connect a 5 V radio signal to Raspberry Pi GPIO.
+These are configurable defaults, not a claim that every SX127x HAT uses this
+pinout. Update `LORA_*` and `RPI_SPI_*` in `configuration.h` for the attached
+radio. Do not connect 5 V signals to Raspberry Pi GPIO.
 
-Enable SPI on the Pi and install the `libgpiod` development library before
-building (for Raspberry Pi OS, `sudo apt install libgpiod-dev`).
-
-## Build and run the radio probe
+## Build and run
 
 From the firmware repository root:
 
@@ -45,7 +43,16 @@ pio run -e raspberry_pi
 .pio/build/raspberry_pi/program
 ```
 
-The target binds DIO0, DIO1, and reset through Portduino's Linux GPIO layer,
-opens the configured spidev device, and initializes the SX1276 with MeshCom's
-default LoRa settings. It does not transmit; received packets are printed as
-hexadecimal bytes.
+Settings, counters, and block-list data are stored under
+`$HOME/.meshcom/raspberry_pi` by default. Set `MESHCOM_DATA_DIR` to use another
+directory.
+
+The serial console accepts the MeshCom command syntax. External JSON-UDP can
+be enabled with `--extudp on` and configured with `--extudpip <host-or-ip>`;
+the firmware listens on UDP port 1799 and sends frames to that peer.
+
+The native target provides the local SX127x mesh RX/TX path, command console,
+persistent settings, and external JSON-UDP. The ESP32 web UI, BLE, displays,
+physical buttons, GPS, sensors, KISS TCP, and hardware battery readings are
+not available on this target. Network interface addressing is managed by
+Linux.

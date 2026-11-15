@@ -17,7 +17,7 @@
 
 #ifdef SX127X
     #include <RadioLib.h>
-    extern SX1278 radio;
+    extern SX1276 radio;
     extern int transmissionState;
 #endif
 
@@ -511,7 +511,7 @@ bool lora_setchip_new(float rf_freq, float rf_bw, int rf_sf, int rf_cr, int rf_s
 #if defined(BOARD_T5_EPAPER)
 //extra source
 
-#elif defined (ESP32)
+#elif defined (ESP32) || defined(RASPBERRY_PI_NATIVE)
 
     if(bLORADEBUG)
         Serial.printf("[LoRa]...RF_FREQUENCY: %.3f MHz\n", rf_freq);

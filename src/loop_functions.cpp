@@ -37,6 +37,7 @@
 #endif
 
 #include "TinyGPSPlus.h"
+extern TinyGPSPlus gps;
 
 #include "printfdeb_functions.h"
 
@@ -1254,7 +1255,7 @@ int esp32_isSSD1306(int address)
     w = &Wire;
 
     w->beginTransmission(address);
-    w->write(0x00);
+    w->write((uint8_t)0x00);
     w->endTransmission(false);
     w->requestFrom(address, 1);
 
@@ -1379,6 +1380,14 @@ static bool e290FullRefreshDue()
 
 void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
 {
+    #if defined(RASPBERRY_PI_NATIVE)
+    (void)bClear;
+    (void)bTransfer;
+    (void)x;
+    (void)y;
+    (void)text;
+    return;
+    #else
     #if !defined (BOARD_T_DECK)  && !defined (BOARD_T_DECK_PLUS)
 
     #if MC_HAS_U8G2   // GRD-01: war die wortgleiche 11-Term-Liste
@@ -1534,6 +1543,7 @@ void sendDisplay1306(bool bClear, bool bTransfer, int x, int y, char *text)
                     #if defined(BOARD_E290)
                     if(bE290Full)
                         epaper_display.fastmodeOn();   // back to fastmode ON: the panel RAMs hold what is on screen
+                    #endif
                     #endif
                     }
                 }
@@ -3980,7 +3990,7 @@ void printBuffer_ack(char *msgSource, uint8_t payload[UDP_TX_BUF_SIZE+10], int16
 // APRS Meldungen
 void DisplayPong(char line1[20], char line2[20], char line3[20], char line4[20])
 {
-    #if (defined(BOARD_E290) || defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E213))
+    #if defined(RASPBERRY_PI_NATIVE) || (defined(BOARD_E290) || defined(BOARD_WIRELESS_PAPER) || defined(BOARD_E213))
     // do nothing
     #elif defined(BOARD_T_ECHO) || defined(BOARD_HELTEC_T114) || defined(BOARD_STICK_V3)
     // do nothing

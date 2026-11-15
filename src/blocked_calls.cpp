@@ -1,15 +1,20 @@
 // BLK-01 -- call blocklist core, see blocked_calls.h.
 #include "blocked_calls.h"
+#include <configuration.h>
 
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <strings.h>
+#include <mutex>
 
-#if !defined(NATIVE_BUILD)
+#if !defined(NATIVE_BUILD) || defined(RASPBERRY_PI_NATIVE)
 #include <Arduino.h>
 #if defined(ESP32)
 #include <Preferences.h>
+#elif defined(RASPBERRY_PI_NATIVE)
+#include <rpi_storage.h>
+#include <string>
 #else
 #include <FreeRTOS.h>
 #include <task.h>
@@ -21,13 +26,17 @@ using namespace Adafruit_LittleFS_Namespace;
 
 // ---- lock --------------------------------------------------------------
 // The list is only copied under the lock (<= 160 B); matching runs outside.
-#if defined(NATIVE_BUILD)
+#if defined(NATIVE_BUILD) && !defined(RASPBERRY_PI_NATIVE)
 #define BLK_LOCK()
 #define BLK_UNLOCK()
 #elif defined(ESP32)
 static portMUX_TYPE s_mux = portMUX_INITIALIZER_UNLOCKED;
 #define BLK_LOCK() portENTER_CRITICAL(&s_mux)
 #define BLK_UNLOCK() portEXIT_CRITICAL(&s_mux)
+#elif defined(RASPBERRY_PI_NATIVE)
+static std::mutex s_mux;
+#define BLK_LOCK() s_mux.lock()
+#define BLK_UNLOCK() s_mux.unlock()
 #else
 #define BLK_LOCK() taskENTER_CRITICAL()
 #define BLK_UNLOCK() taskEXIT_CRITICAL()
@@ -341,7 +350,7 @@ uint32_t blockListDrops() { return s_drops; }
 // Key and file format are fixed: nodes coming from a fork that wrote the same
 // ones keep their list.
 
-#if defined(NATIVE_BUILD)
+#if defined(NATIVE_BUILD) && !defined(RASPBERRY_PI_NATIVE)
 
 void blockListLoad() {}
 static bool s_host_save_fail = false;   // host tests: simulate a full NVS
@@ -411,6 +420,38 @@ static bool blockListSaveImpl()
                      : (!prefs.isKey(kBlockKey) || prefs.remove(kBlockKey));
     prefs.end();
     return ok;
+}
+
+#elif defined(RASPBERRY_PI_NATIVE)
+
+static const char kBlockFile[] = "blocklist.cfg";
+static const char kBlockMagic[] = "BLK1:";
+
+void blockListLoad()
+{
+    std::string data;
+    const auto result = RaspberryPiStorage::readFile(kBlockFile, data);
+    if (result == RaspberryPiStorage::ReadResult::error)
+    {
+        Serial.printf("[BLOCK];load;read_failed\n");
+        return;
+    }
+
+    const size_t ml = sizeof(kBlockMagic) - 1;
+    if (result != RaspberryPiStorage::ReadResult::ok ||
+        data.size() < ml || data.compare(0, ml, kBlockMagic) != 0)
+        return;
+
+    applyLoaded(data.c_str() + ml);
+}
+
+static bool blockListSaveImpl()
+{
+    char csv[BLOCKLIST_CSV_MAX];
+    blockListGet(csv, sizeof(csv));
+    char buf[sizeof(kBlockMagic) + BLOCKLIST_CSV_MAX];
+    int len = snprintf(buf, sizeof(buf), "%s%s", kBlockMagic, csv);
+    return len >= 0 && RaspberryPiStorage::writeFileAtomic(kBlockFile, buf, (size_t)len);
 }
 
 #else // nRF52

@@ -89,10 +89,10 @@ String getDateTime(unsigned long timestamp)
 
 String convertUNIXtoString(uint32_t timestamp)
 {
-    time_t unix = timestamp;
+    time_t unixTime = timestamp;
 
     char buffer[22];
-    strftime(buffer, sizeof(buffer), "%Y.%m.%d %H:%M:%S", localtime(&unix));
+    strftime(buffer, sizeof(buffer), "%Y.%m.%d %H:%M:%S", localtime(&unixTime));
 
     String strDateTime=buffer;
 

@@ -81,7 +81,7 @@ String scanI2C()
                     byte buffer[1];
 
                     w->beginTransmission(address);
-                    w->write(0x00);
+                    w->write((uint8_t)0x00);
                     w->endTransmission(false);
                     w->requestFrom(address, (size_t)(1));
                     

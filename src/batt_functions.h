@@ -102,7 +102,7 @@ int wpBattHistory(float* out, int maxn);   // letzte Spannungs-Rohwerte, neueste
 	#include "nrf52/t_echo_utilities.h"
 #endif
 
-#if !defined(NRF52_SERIES)
+#if !defined(NRF52_SERIES) && !defined(RASPBERRY_PI_NATIVE) && !defined(NATIVE_BUILD)
 	#include <esp_adc_cal.h>
 #endif
 

@@ -5,6 +5,7 @@
 
 void init_onebutton(void);
 
+#if !defined(RASPBERRY_PI_NATIVE)
 #include <OneButton.h>
 extern OneButton btn;
 
@@ -12,5 +13,6 @@ void singleClick();
 void doubleClick();
 void tripleClick();
 void PressLong();
+#endif
 
 #endif

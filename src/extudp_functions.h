@@ -5,6 +5,7 @@
 #include <loop_functions_extern.h>
 
 // Extern JSON UDP
+extern bool hasExternIPaddress;
 void startExternUDP();
 void getExternUDP();
 void getExtern(unsigned char icomming[255], int len);

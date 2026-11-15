@@ -7,7 +7,7 @@
 #include <debugconf.h>
 #include <aprs_functions.h>
 
-#ifdef ESP32
+#if defined(ESP32) || defined(RASPBERRY_PI_NATIVE)
     #include <esp32/esp32_flash.h>
 #else
     #include <nrf52/WisBlock-API.h>

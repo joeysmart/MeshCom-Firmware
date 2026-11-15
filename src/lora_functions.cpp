@@ -45,7 +45,7 @@
 
 #ifdef SX127X
     #include <RadioLib.h>
-    extern SX1278 radio;
+    extern SX1276 radio;
     extern volatile int transmissionState;
 #endif
 

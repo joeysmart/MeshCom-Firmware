@@ -17,12 +17,14 @@
 // extudp_functions.h, which is outside the U1 carve's file set).
 #include "udp_frame.h"
 
-// PT-01 (native_extern): none of the network transport below (SPI/WiFi/
-// Ethernet headers, the UdpExtern socket object, and every function that
-// touches it) is reachable from getExtern()/handleExternTelemetry(), which
-// is all this native build links and tests. Guarding it out keeps the
-// hardware/native code identical to before this file was ever built native.
-#ifndef NATIVE_BUILD
+// The native_extern unit-test build defines NATIVE_BUILD and omits the socket
+// transport. The Raspberry Pi firmware instead includes its POSIX RpiUdp
+// adapter; hardware targets keep their existing WiFi/Ethernet transports.
+#if !defined(NATIVE_BUILD)
+#if defined(RASPBERRY_PI_NATIVE)
+#include "rpi_udp.h"
+#include <cerrno>
+#else
 #include <SPI.h>
 
 // WIFI and Ethernet
@@ -38,6 +40,7 @@
   #include <RAK13800_W5100S.h> // Click to install library: http://librarymanager/All#RAK13800_W5100S
   #include <nrf52/nrf_eth.h>
 #endif
+#endif
 #endif // !NATIVE_BUILD
 
 bool hasExternIPaddress = false;
@@ -46,11 +49,15 @@ String s_extern_node_ip = "";
 
 String str_ip;
 
-// PT-01: apip, extern_node_ip and UdpExtern below are only touched by the
-// outbound/socket functions guarded out of this native build -- neither
-// getExtern() nor handleExternTelemetry() reference them, and IPAddress
-// isn't available without the network headers guarded out above.
-#ifndef NATIVE_BUILD
+// Socket state is absent from the NATIVE_BUILD test executable. The Raspberry
+// Pi firmware uses the same Arduino IPAddress value type with its POSIX UDP
+// adapter.
+#if !defined(NATIVE_BUILD)
+#if defined(RASPBERRY_PI_NATIVE)
+IPAddress apip;
+IPAddress extern_node_ip;
+RpiUdp UdpExtern;
+#else
 IPAddress apip;
 
 #ifdef BOARD_T_ETH_ELITE
@@ -62,6 +69,7 @@ IPAddress apip;
 #else
   IPAddress extern_node_ip;
   EthernetUDP UdpExtern;
+#endif
 #endif
 #endif // !NATIVE_BUILD
 
@@ -95,12 +103,80 @@ static int externQueueWrite = 0;
 
 // Extern JSON UDP
 //
-// PT-01: startExternUDP() only sets up the UdpExtern socket (guarded above)
-// and is not part of the getExtern()/handleExternTelemetry() input path this
-// native build tests -- guarded out with it.
-#ifndef NATIVE_BUILD
+// startExternUDP() initializes the platform-specific UDP transport. The
+// native_extern unit-test executable omits this function with NATIVE_BUILD.
+#if !defined(NATIVE_BUILD)
 void startExternUDP()
 {
+#if defined(RASPBERRY_PI_NATIVE)
+  if(!bEXTUDP || hasExternIPaddress)
+    return;
+
+  static uint32_t last_fail_log = 0;
+  static bool first_fail = true;
+  IPAddress local_ip;
+  IPAddress netmask;
+  char error[128];
+  if(!rpiResolveUdpPeer(meshcom_settings.node_extern, EXTERN_PORT,
+                        apip, local_ip, netmask, error, sizeof(error)))
+  {
+    const uint32_t now = millis();
+    if(first_fail || static_cast<uint32_t>(now - last_fail_log) >= 30000)
+    {
+      Serial.printf("[EXT] peer resolution failed;host;%s;error;%s\n",
+                    meshcom_settings.node_extern, error);
+      first_fail = false;
+      last_fail_log = now;
+    }
+    return;
+  }
+
+  extern_node_ip = local_ip;
+  char local_text[16];
+  char peer_text[16];
+  char netmask_text[16];
+  snprintf(local_text, sizeof(local_text), "%u.%u.%u.%u",
+           local_ip[0], local_ip[1], local_ip[2], local_ip[3]);
+  snprintf(peer_text, sizeof(peer_text), "%u.%u.%u.%u",
+           apip[0], apip[1], apip[2], apip[3]);
+  snprintf(netmask_text, sizeof(netmask_text), "%u.%u.%u.%u",
+           netmask[0], netmask[1], netmask[2], netmask[3]);
+  s_extern_node_ip = local_text;
+  str_ip = peer_text;
+
+  const ExtudpTargetVerdict verdict =
+      extudp_target_check(peer_text, local_text, netmask_text);
+  if(verdict != EXTUDP_TARGET_OK)
+  {
+    static String refusedTarget;
+    if(refusedTarget != peer_text)
+    {
+      refusedTarget = peer_text;
+      Serial.printf("[EXT] target %s refused: %s -- set --extudpip to a host\n",
+                    peer_text, extudp_target_reason(verdict));
+    }
+    return;
+  }
+
+  if(UdpExtern.begin(EXTERN_PORT) == 0)
+  {
+    if(first_fail || static_cast<uint32_t>(millis() - last_fail_log) >= 30000)
+    {
+      Serial.printf("[EXT] socket bind failed;port;%d;errno;%d\n", EXTERN_PORT, errno);
+      first_fail = false;
+      last_fail_log = millis();
+    }
+    return;
+  }
+
+  Serial.printf("[EXT]...now listening at IP %s, UDP port %d\n",
+                local_text, EXTERN_PORT);
+  Serial.printf("[EXT]...now sending   to IP %s, UDP port %d\n",
+                peer_text, EXTERN_PORT);
+  hasExternIPaddress = true;
+  first_fail = true;
+  sendExternHeartbeat();
+#else
   #ifdef BOARD_T_ETH_ELITE
       static bool ethStarted = false;
 
@@ -229,6 +305,7 @@ void startExternUDP()
   hasExternIPaddress=true;
 
   sendExternHeartbeat();
+#endif
 }
 #endif // !NATIVE_BUILD
 
@@ -411,19 +488,18 @@ void getExtern(unsigned char incoming[], int len)
   // NATIVE_BUILD: setMsgOrigin() lives in loop_functions.cpp, which the
   // getExtern() host test does not link (build_src_filter, env:native_extern).
   // The tag has no effect on a parser test either way.
-#ifndef NATIVE_BUILD
+#if !defined(NATIVE_BUILD)
   setMsgOrigin(ORIGIN_EXTUDP);
 #endif
   (void)sendMessage(val, strlen(val));
-#ifndef NATIVE_BUILD
+#if !defined(NATIVE_BUILD)
   setMsgOrigin(ORIGIN_NONE);
 #endif
 }
 
-// PT-01: getExternUDP() only reads the UdpExtern socket (guarded above) and
-// hands the datagram to getExtern() below -- not part of what this native
-// build tests, guarded out with the socket it depends on.
-#ifndef NATIVE_BUILD
+// getExternUDP() reads the platform UDP socket and hands datagrams to the
+// shared getExtern() parser. NATIVE_BUILD tests the parser without a socket.
+#if !defined(NATIVE_BUILD)
 void getExternUDP()
 {
   #ifdef ESP32
@@ -513,19 +589,18 @@ void getExternUDP()
     // Serial.printf on purpose: printfdeb() is gated on --debug and DEBUG_MSG
     // compiles away entirely (memory debug-msg-compiles-away).
     // Unit note: nRF52/FreeRTOS returns WORDS (x4 = bytes), ESP32 returns bytes.
+#if defined(ESP32) || defined(NRF52_SERIES)
     Serial.printf("[EXT];rx;len;%d;stack_hwm;%u;ms;%lu\n", len,
                   (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
+#endif
   }
 }
 #endif // !NATIVE_BUILD
 
-// PT-01: sendExtern() (and everything below it -- queueExtern(),
-// flushExternQueue(), sendExternHeartbeat(), resetExternUDP())
-// is the outbound path to the EXTUDP peer: it decodes an APRS frame off the
-// mesh and re-serializes it as JSON onto UdpExtern (guarded above). None of
-// it is reachable from getExtern()/handleExternTelemetry(), the inbound
-// parser this native build tests, so it is guarded out with the socket.
-#ifndef NATIVE_BUILD
+// sendExtern() decodes a mesh APRS frame and serializes it as JSON for the
+// platform UDP transport. NATIVE_BUILD tests the inbound parser independently
+// and therefore omits the socket-backed send path.
+#if !defined(NATIVE_BUILD)
 void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)
 {
   (void)bUDP;
@@ -620,8 +695,8 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
     
     char _lat_c[3] = {0};
     char _long_c[3] = {0};
-    sniprintf(_lat_c, sizeof(_lat_c), "%c", aprspos.lat_c);
-    sniprintf(_long_c, sizeof(_long_c), "%c", aprspos.lon_c);
+    snprintf(_lat_c, sizeof(_lat_c), "%c", aprspos.lat_c);
+    snprintf(_long_c, sizeof(_long_c), "%c", aprspos.lon_c);
 
     JsonDocument cJson;
 
@@ -839,8 +914,10 @@ void sendExtern(bool bUDP, char *src_type, uint8_t buffer[500], uint16_t buflen,
   // UDP-01 / TM-43, outbound counterpart of the [EXT];rx line above: this is
   // the path N-22 measured (watermark 0 at its deepest point before the fix
   // moved c_json/c_tjson into BSS on nRF52). Same line format, same units.
+#if defined(ESP32) || defined(NRF52_SERIES)
   Serial.printf("[EXT];tx;len;%u;stack_hwm;%u;ms;%lu\n", (unsigned)strlen(c_json),
                 (unsigned)uxTaskGetStackHighWaterMark(NULL), (unsigned long)millis());
+#endif
 }
 
 void queueExtern(char *src_type, uint8_t buffer[500], uint16_t buflen, int16_t rssi, int8_t snr)

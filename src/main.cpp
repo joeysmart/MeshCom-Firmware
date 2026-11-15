@@ -12,6 +12,11 @@
   #include <esp32/esp32_main.h>
 #endif
 
+#if defined(RASPBERRY_PI_NATIVE)
+  void raspberryPiSetup();
+  void raspberryPiLoop();
+#endif
+
 #if defined(BOARD_RAK4630)
   #include <nrf52/nrf52_main.h>
   // Stack of the task that runs nrf52loop(), in 32-bit words: 8 kB, twice the
@@ -81,6 +86,10 @@ void setup()
     #if defined ESP32
       esp32setup();
     #endif
+
+    #if defined(RASPBERRY_PI_NATIVE)
+      raspberryPiSetup();
+    #endif
   }
 
 void loop()
@@ -99,6 +108,10 @@ void loop()
   //#elif ESP32
   #if defined ESP32
     esp32loop();
+  #endif
+
+  #if defined(RASPBERRY_PI_NATIVE)
+    raspberryPiLoop();
   #endif
 
   // Rohframe-Mitschnitt ausgeben. Die Erfassung sitzt im Radio-Callback bzw.
